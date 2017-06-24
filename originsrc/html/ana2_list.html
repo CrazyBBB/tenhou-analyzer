@@ -1,0 +1,130 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>牌譜一覧</title>
+	<style type="text/css">A:link{color:blue;}A:visited{color:blue;}A:hover{color:red;}BODY,TABLE{font-size:10pt;}</style>
+	<style type="text/css">
+		DIV#c{white-space:nowrap;font-family:'ＭＳ ゴシック';}
+	</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center id=t>
+	<div id=v></div>
+	<hr size=1 color=#CCCCCC>
+	<form name=f style="margin:0px;"></form>
+	</center>
+	<hr size=1 color=#CCCCCC>
+	<div id=c></div>
+
+<script type="text/javascript" src="tenhou.js"></script>
+<script type="text/javascript" src="util.js"></script>
+<script type="text/javascript" src="http://tenhou.net/stat/rating.js"></script>
+<script type="text/javascript">
+///////////////////////////////////////////////////////////////////
+// TENHOU.NET (C)C-EGG http://tenhou.net/
+//-----------------------------------------------------------------
+var we=window.external; // 内部関数呼び出し用
+var logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0"); // IDispatchLogAnaImpl
+var cache=logana.cache; // IDispatchCacheImpl
+//var sortAs="CTimeAscent"; // ファイル作成時間の古いものから
+var sortAs="CTimeDescent"; // ファイル作成時間の新しいものから(default)
+var enumPlayer;
+var enumLobbyID;
+var enumMatchMask;
+var enumMatch;
+var enumSkipMask;
+var enumSkip;
+
+///////////////////////////////////////////////////////////////////
+// MAIN
+//-----------------------------------------------------------------
+var cache_data;
+var loginfo;
+var s=[]; // output
+var nWantAnalyze;
+var f=document.f;
+
+function OnAnalyzeBegin(){
+	s=[];
+	if (nWantAnalyze!=undefined) s.push("(最新"+nWantAnalyze+"件を表示中)<br>");
+	eh('c','<center><button onclick="stop();">STOP</button></center>');
+}
+function OnEnumCache(key,loginfo_){
+	if (!loginfo_) return;
+	loginfo=loginfo_;
+	var gt=loginfo.wGameType;
+	cache_data=cache.get(key).split("\n");
+
+	var tw=loginfo.tw;
+	var un  =cache_data[1].split(" "); // un
+	var dan =cache_data[2].split(","); // dan
+	var rate=cache_data[3].split(","); // rate
+	var sc  =cache_data[5].split(","); // sc
+	var w2r =cache_data[7].split(","); // w2r
+	var ss="";
+	ss+=(loginfo.wLobbyID>=10000?"C":"L")+("000"+(loginfo.wLobbyID%10000)).slice(-4);
+	ss+=" ";
+	ss+=GT.toString(gt);
+	ss+=" ";
+
+	var f=loginfo;
+	var url="http://tenhou.net/0/?log="+f.filetw;
+	var dn=GT.ISDAN(gt);
+	var rate=[
+		RatingConv(gt,rate[0]),
+		RatingConv(gt,rate[1]),
+		RatingConv(gt,rate[2]),
+		RatingConv(gt,rate[3])
+	];
+	if (gt&GT.SANMA){
+		var aRate=(rate[0]+rate[1]+rate[2])/3;
+		ss+="平均R"+ff(aRate,1,1)+" ";
+		ss+="<a href='"+url+"'>"+url+"</a><br>";
+		var t=[
+			"<b>"+(int(w2r[0])+1)+"位</b> "+un[0]+"("+(dn?DAN[dan[0]]:"")+"R"+rate[0]+"/"+fp(sc[1])+") ",
+			"<b>"+(int(w2r[1])+1)+"位</b> "+un[1]+"("+(dn?DAN[dan[1]]:"")+"R"+rate[1]+"/"+fp(sc[3])+") ",
+			"<b>"+(int(w2r[2])+1)+"位</b> "+un[2]+"("+(dn?DAN[dan[2]]:"")+"R"+rate[2]+"/"+fp(sc[5])+") "
+		];
+		ss+=t[(tw+0)%3];
+		ss+=t[(tw+1)%3];
+		ss+=t[(tw+2)%3];
+	}else{
+		var aRate=(rate[0]+rate[1]+rate[2]+rate[3])/4;
+		ss+="平均R"+ff(aRate,1,1)+" ";
+		ss+="<a href='"+url+"'>"+url+"</a><br>";
+		var t=[
+			"<b>"+(int(w2r[0])+1)+"位</b> "+un[0]+"("+(dn?DAN[dan[0]]:"")+"R"+rate[0]+"/"+fp(sc[1])+") ",
+			"<b>"+(int(w2r[1])+1)+"位</b> "+un[1]+"("+(dn?DAN[dan[1]]:"")+"R"+rate[1]+"/"+fp(sc[3])+") ",
+			"<b>"+(int(w2r[2])+1)+"位</b> "+un[2]+"("+(dn?DAN[dan[2]]:"")+"R"+rate[2]+"/"+fp(sc[5])+") ",
+			"<b>"+(int(w2r[3])+1)+"位</b> "+un[3]+"("+(dn?DAN[dan[3]]:"")+"R"+rate[3]+"/"+fp(sc[7])+") "
+		];
+		ss+=t[(tw+0)%4];
+		ss+=t[(tw+1)%4];
+		ss+=t[(tw+2)%4];
+		ss+=t[(tw+3)%4];
+	}
+	s.push(ss);
+	if (nWantAnalyze!=undefined){
+		if (--nWantAnalyze<=0) stop();
+	}
+	return true;
+}
+function OnAnalyzeEnd(){
+	s=s.join("<br>");
+	s+="<hr size=1 color=#CCCCCC>";
+	s+='<center><button onclick="showall();">全件表示</button></center>';
+	eh('c',s);
+}
+///////////////////////////////////////////////////////////////////
+eh('v',document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+function start(){uiGetEnumParam(document.f), logana.analyze(window);}
+function stop(){logana.stop();}
+function selchange_(){nWantAnalyze=       10, start();}
+function selchange (){stop(), setTimeout(selchange_,1);}
+function showall_  (){nWantAnalyze=undefined, start();}
+function showall   (){stop(), setTimeout(showall_  ,1);}
+function init(){uiCreate(document.f,{all_player:true,show_lobby:true,all_lobby:true,rule_pf:1|2|4|8|16|32|64,use_taku:true});selchange();}
+init();
+</script>
+</body></html>

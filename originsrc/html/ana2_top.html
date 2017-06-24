@@ -1,0 +1,60 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>牌譜解析スクリプト</title>
+	<style type="text/css">A:link{color:blue;}A:visited{color:blue;}A:hover{color:red;}BODY,TABLE{font-size:10pt;}</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center>
+<script type="text/javascript">
+var we=window.external; // 内部関数呼び出し用
+var logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0"); // IDispatchLogAnaImpl
+var cache=logana.cache; // IDispatchCacheImpl
+document.write(document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+</script>
+
+	<hr size=1 color=#CCCCCC>
+	<br>
+	<table><tr><td>
+	■ <a href="./">新しい牌譜を追加する</a><br>
+	※解析中に対戦を行い「牌譜が増えた」場合<br>
+	<br>
+	■ <a href="./" onclick="cache.clear();">キャッシュをクリアしてすべての牌譜を解析する</a><br>
+	※ファイルの移動や削除で「牌譜が減った」場合<br>
+	</td></tr></table>
+	<br>
+	</center>
+
+<hr size=1 color=#CCCCCC>
+■牌譜の解析を行うには、有料版を使用して「牌譜をファイルに保存する」必要があります。<br>
+- Windows版 : 設定の「牌譜」タブで「牌譜をファイルに保存する」にチェックしてから対戦<br>
+- FlashPremium版 : Flash版専用ブラウザを使用して対戦<br>
+<hr size=1 color=#CCCCCC>
+■天鳳位の全牌譜をダウンロードして比較対象にする<br>
+１．<a href="http://tenhou.net/ranking.html">ランキング</a>から天鳳位の牌譜をダウンロード<br>
+２．天鳳の牌譜ファイルが保存されているフォルダの下に解凍する<br>
+例）C:\Users\[アカウント名]\Documents\My Tenhou\log\mjlog_pf3-20_n1<br>
+３．解析を行う<br>
+<hr size=1 color=#CCCCCC>
+■スクリプトの動作など<br>
+- ４人抜けで終了していない対戦は列挙しません<br>
+- ログのファイル名を変更すると牌譜URLが無効になります<br>
+- エラーが発生した場合はそれ以降の関数は呼び出されません(OnLogEnd,OnAnalyzeEndなど)<br>
+- 配布時にはwindow.onerrorは標準の関数を使用するようにしてください<br>
+<hr size=1 color=#CCCCCC>
+■その他<br>
+※予告無く仕様変更を行なう場合があります<br>
+※HTML/JSの改編/再配布は自由に行なってください。<br>
+※tenhou.net以外のポップアップは禁止されています。<br>
+※サンプルや一般的なHTMLやJavaScriptなどに関するサポートはありません。<br>
+※解析エラーが出る場合には、<a href="http://tenhou.net/0/wb.html">最新版の専用ブラウザ</a>を使用してください。<br>
+<hr size=1 color=#CCCCCC>
+■HISTORY<br>
+	2013.04.15 技能戦の拡張書式に一時的に対応(ver1.6b)<br>
+	2011.10.11 待ちに関する解析に対応(ver1.6)<br>
+	2011.08.07 ドラナシの牌譜が解析できなかった問題を修正<br>
+	2011.08.04 牌譜解析機能を拡張Ver1.02へ<br>
+	2010.03.03 解析不具合を修正(Ver1.4e)<br>
+	2010.10.15 雀荘戦の牌譜での不具合を修正(Ver1.4f)<br>
+</body></html>

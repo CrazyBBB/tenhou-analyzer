@@ -1,0 +1,196 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>和了集計</title>
+	<style type="text/css">A:link{color:blue;}A:visited{color:blue;}A:hover{color:red;}BODY,TABLE{font-size:10pt;}</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center>
+	<div id=v></div>
+	<hr size=1 color=#CCCCCC>
+	<form name=f style="margin:0px;"></form>
+	<br>
+	<div id=c></div>
+	</center>
+
+<script type="text/javascript" src="tenhou.js"></script>
+<script type="text/javascript" src="util.js"></script>
+<script type="text/javascript">
+///////////////////////////////////////////////////////////////////
+// TENHOU.NET (C)C-EGG http://tenhou.net/
+//-----------------------------------------------------------------
+var we=window.external; // 内部関数呼び出し用
+var logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0");  // IDispatchLogAnaImpl
+var cache=logana.cache; // IDispatchCacheImpl
+//var sortAs="CTimeAscent"; // ファイル作成時間の古いものから
+var sortAs="CTimeDescent"; // ファイル作成時間の新しいものから(default)
+var enumPlayer;
+var enumLobbyID;
+var enumMatchMask;
+var enumMatch;
+var enumSkipMask
+var enumSkip;
+
+///////////////////////////////////////////////////////////////////
+// MAIN
+//-----------------------------------------------------------------
+var c;
+var cTokuten;
+var cHan;
+var cMangan;
+var nTsumoM, nRonM;
+var nTsumoR, nRonR;
+var nTsumoF, nRonF;
+
+var cache_data;
+var loginfo; // IDispatchLogInfoImpl [static reference]
+var player;  // IDispatchPlayerImpl  [static reference]
+var f=document.f;
+
+function OnAnalyzeBegin(){
+	c={
+		対戦数:0,
+		和了回数:0,
+		_:0
+	};
+	cTokuten={};
+	cHan={};
+	cMangan={};
+	nTsumoM=nRonM=0;
+	nTsumoR=nRonR=0;
+	nTsumoF=nRonF=0;
+	eh('c','<button onclick="stop();">STOP</button>');
+}
+function OnEnumCache(key,loginfo_){
+	if (!loginfo_) return;
+	loginfo=loginfo_;
+	cache_data=cache.get(key).split("\n");
+
+	var tw=loginfo.tw;
+	cache_data[10]=eval("["+cache_data[10]+"]");
+	cache_data[11]=eval("["+cache_data[11]+"]");
+	var n=0;
+	for(;n<cache_data[10].length;++n){
+		var bMenzen=true;//(cache_data[11][n][tw].length==0);
+		for(var i=0;i<cache_data[11][n].length;++i){
+			var ac=cache_data[11][n][i];
+			if (ac.length!=11) continue;
+			if (ac[0]!=tw) continue;
+			if (ac[2]==NAKI.ANKAN || ac[2]==NAKI.NUKI) continue;
+			bMenzen=false;
+			break;
+		}
+
+		var a=cache_data[10][n];
+		var nn=0;
+		for(;nn<a.length;++nn){
+			var aa=a[nn];
+			if (aa.length!=13) continue;
+			if (tw!=aa[0]) continue;
+			var who=aa[0];
+			var tokuten=aa[2];
+			var mangan =aa[3];
+			var yaku   =aa[4];
+			var yakuman=aa[5];
+			var fromWho=aa[9];
+			var paoWho =aa[8];
+			var i, han=0;
+			var bReach=false;
+			if (yakuman.length){ // 純粋役満の場合は役は無効
+				han=yakuman.length*13; // １３飜としてカウント
+			}else{
+				for(i=0;i<yaku.length;i+=2){
+					if (yaku[i+0]==1) bReach=true;
+					han+=yaku[i+1];
+				}
+			}
+			if (fromWho==who){
+				bMenzen?(bReach?nTsumoR++:nTsumoM++):nTsumoF++;
+			}else{ // ロン
+				bMenzen?(bReach?nRonR++:nRonM++):nRonF++;
+			}
+			cTokuten[tokuten]==undefined?cTokuten[tokuten]={k:tokuten,n:1          }:(cTokuten[tokuten].n++                      );
+			cHan    [han    ]==undefined?cHan    [han    ]={k:han    ,n:1,t:tokuten}:(cHan    [han    ].n++, cHan[han].t+=tokuten);
+			cMangan [mangan ]==undefined?cMangan [mangan ]={k:mangan ,n:1          }:(cMangan [mangan ].n++                      );
+			c.和了回数++;
+		}
+	}
+	c.対戦数++;
+}
+function OnAnalyzeEnd(){ // 解析終了
+	var i,s="", a;
+	if (nTsumoM+nTsumoR+nTsumoF+nRonM+nRonR+nRonF!=c.和了回数) s+=("<font color=#FF0000>ERROR</font><br><br>");
+
+	s+="対戦数:"+c.対戦数+"　";
+	s+="ツモ ( "+(nTsumoM+nTsumoR+nTsumoF)+"回 "+ff((nTsumoM+nTsumoR+nTsumoF)*100,c.和了回数,2)+"% )　";
+	s+="ロン ( "+(nRonM  +nRonR  +nRonF  )+"回 "+ff((nRonM  +nRonR  +nRonF  )*100,c.和了回数,2)+"% )";
+	s+="<br>";
+
+	s+="<table border=1 cellspacing=0>";
+	s+="<colgroup><col span=8 align=center ></col></colgroup>";
+	s+="<tr><td colspan=6 >和了<br>"+c.和了回数+"回 100.00%</td></tr>";
+	s+="<tr>"+
+		"<td colspan=4 >門前<br>"+(nTsumoM+nTsumoR+nRonM+nRonR)+"回 "+ff((nTsumoM+nTsumoR+nRonM+nRonR)*100,c.和了回数,2)+"%</td>"+
+		"<td colspan=2 rowspan=2 >副露<br>"+(nTsumoF+nRonF    )+"回 "+ff((nTsumoF        +nRonF      )*100,c.和了回数,2)+"%</td></tr>";
+	s+="<tr>"+
+		"<td colspan=2 >立直<br>"+(nTsumoR+nRonR)+"回 "+ff((nTsumoR+nRonR)*100,c.和了回数,2)+"%</td>"+
+		"<td colspan=2 >ダマ<br>"+(nTsumoM+nRonM)+"回 "+ff((nTsumoM+nRonM)*100,c.和了回数,2)+"%</td></tr>";
+	s+="<tr>"+
+		"<td>ツモ<br>"+nTsumoR+"回<br>"+ff(nTsumoR*100,c.和了回数,2)+"%</td>"+
+		"<td>ロン<br>"+nRonR  +"回<br>"+ff(nRonR  *100,c.和了回数,2)+"%</td>"+
+		"<td>ツモ<br>"+nTsumoM+"回<br>"+ff(nTsumoM*100,c.和了回数,2)+"%</td>"+
+		"<td>ロン<br>"+nRonM  +"回<br>"+ff(nRonM  *100,c.和了回数,2)+"%</td>"+
+		"<td>ツモ<br>"+nTsumoF+"回<br>"+ff(nTsumoF*100,c.和了回数,2)+"%</td>"+
+		"<td>ロン<br>"+nRonF  +"回<br>"+ff(nRonF  *100,c.和了回数,2)+"%</td></tr>";
+	s+="</table>";
+	s+="<br>";
+
+	/*
+	a=[], s+="tokuten<br>";
+	for(i in cTokuten) a.push(cTokuten[i]);
+	a.sort(function(a,b){return b.k-a.k;});
+	for(i in a) s+=a[i].k+" "+a[i].n+" / ";
+	s+="<br>";
+	*/
+
+	a=[],s+="■５飜以下の和了<br>";
+	for(i in cHan) a.push(cHan[i]);
+	a.sort(function(a,b){return a.k-b.k;});
+	s+="<table border=1 cellspacing=0>";
+	s+="<colgroup><col span=20 align=right ></col></colgroup>";
+	s+="<tr><th></th>";
+	for(i in a)	if (a[i].k<6) s+="<th>"+a[i].k+"飜</th>";
+	s+="</tr><td>回<br>%<br>点</td>";
+	for(i in a)	if (a[i].k<6) s+="<td>"+a[i].n+"回<br>"+ff(a[i].n*100,c.和了回数,2)+"%<br>"+ff(a[i].t,a[i].n,2)+"</td>"
+	s+="</tr></table>";
+	s+="<br>";
+
+	var m=cMangan;
+	for(i=0;i<6;++i) m[i]?( m[i].f=ff(m[i].n*100,c.和了回数,2) ):(m[i]={n:0,f:"0.00"});
+	a=[], s+="■満貫<br>";
+	s+="<table border=1 cellspacing=0>";
+	s+="<colgroup><col span=7 align=right ></col></colgroup>";
+	s+="<tr><th></th><th>満貫未満</th><th>満貫</th><th>跳満</th><th>倍満</th><th>三倍満</th><th>役満</th></tr>";
+	s+="<tr><td>回数</td><td>"+m[0].n+"</td><td>"+m[1].n+"</td><td>"+m[2].n+"</td><td>"+
+			m[3].n+"</td><td>"+m[4].n+"</td><td>"+m[5].n+"</td></tr>";
+	s+="<tr><td>割合</td><td>"+m[0].f+"%</td><td>"+m[1].f+"%</td><td>"+m[2].f+"%</td><td>"+
+			m[3].f+"%</td><td>"+m[4].f+"%</td><td>"+m[5].f+"%</td></tr>";
+	s+="</table>";
+
+	eh('c',s);
+	stop();
+}
+
+
+///////////////////////////////////////////////////////////////////
+// MAIN
+//-----------------------------------------------------------------
+eh('v',document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+function start(){uiGetEnumParam(document.f), logana.analyze(window);}
+function stop(){logana.stop();}
+function selchange(){stop(), setTimeout(start,1);}
+function init(){uiCreate(document.f,{show_lobby:true,rule_pf:2|4|8|16|32|64,use_taku:true});selchange();}
+init();
+</script>
+</body></html>

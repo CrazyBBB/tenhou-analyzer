@@ -1,0 +1,237 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>Rateグラフ</title>
+	<style type="text/css">A:link{color:blue;}A:visited{color:blue;}A:hover{color:red;}BODY,TABLE{font-size:10pt;}</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center>
+	<div id=v></div>
+	<hr size=1 color=#CCCCCC />
+	<form name=f style="margin:0px;"></form>
+	<br>
+	<div id=c></div>
+	<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" id=movie width=500 height=300>
+		<param name=movie value="plot.swf">
+		<param name=quality value=high>
+		<param name=bgcolor value=#FFFFFF>
+		<embed id=mov src="plot.swf" quality=high bgcolor=#FFFFFF width=500 height=300></embed>
+	</object><br>
+	X:対戦数 Y:Rate<br>
+	<hr size=1 color=#CCCCCC />
+	※対戦終了前のRateをプロットするため最後は最新のRateと一致しません<br>
+	</center>
+
+
+<script type="text/javascript" src="tenhou.js"></script>
+<script type="text/javascript" src="util.js"></script>
+<script type="text/javascript" src="plot.js"></script>
+<script type="text/javascript">
+///////////////////////////////////////////////////////////////////
+// TENHOU.NET (C)C-EGG http://tenhou.net/
+///////////////////////////////////////////////////////////////////
+var we=window.external; // 内部関数呼び出し用
+var logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0"); // IDispatchLogAnaImpl
+var cache=logana.cache; // IDispatchCacheImpl
+var sortAs="CTimeAscent"; // ファイル作成時間の古いものから
+//var sortAs="CTimeDescent"; // ファイル作成時間の新しいものから(default)
+var enumPlayer;
+var enumLobbyID;
+var enumMatchMask;
+var enumMatch;
+var enumSkipMask
+var enumSkip;
+
+///////////////////////////////////////////////////////////////////
+// MAIN
+//-----------------------------------------------------------------
+var vals=[]; // output
+var swf=undefined;
+
+var chart={
+	draw:function(){
+		var s=vals;
+		var w=swf.clientWidth;
+		var h=swf.clientHeight;
+
+		var xMin=0;
+		var xMax=s.length;
+		var yMin=1500;
+		var yMax=1500;
+		var i;
+		for(i=0;i<xMax;++i){
+			if (s[i]>yMax) yMax=s[i];
+			if (s[i]<yMin) yMin=s[i];
+		}
+		if (vals.length<2){
+			eh('c',"<font color=#FF0000 >ERROR : 対戦数（"+s.length+"戦）が不足しています（２戦以上）</font>");
+		}else{
+			var yAve=s[0];
+			for(i=1;i<xMax;++i) yAve+=s[i];
+			yAve=int(yAve/s.length);
+			eh('c',"対戦数:"+s.length+"&nbsp;&nbsp;最大R"+yMax+"&nbsp;&nbsp;最小R"+yMin+"&nbsp;&nbsp;平均R"+yAve);
+		}
+
+		{ // tics align
+			var d=this.gettic(yMax-yMin);
+			yMin=int(yMin/d)*d;
+			yMax=int(yMax/d)*d+d;
+		}
+
+		var cx=50;
+		var cy=10;
+		var cw=w-60;
+		var ch=h-30;
+//		plot.swfwith("_level0.chart");
+//		plot.removeMovieClip();
+		plot.swfwith("_level0");
+		plot.createEmptyMovieClip("chart",0);
+		plot.swfwith("_level0.chart");
+		plot.createEmptyMovieClip("xtics",0);
+		plot.createEmptyMovieClip("ytics",1);
+		{ // frame
+			plot.lineStyle(1,0xDDDDDD,100);
+			plot.beginGradientFill("linear",
+				[ 0xFFFFFF, 0xF0F0F0 ], // colors
+				[ 100, 100 ], // alphas
+				[ 0x00, 0xFF ], // ratios
+				{ matrixType:"box", x:0, y:0, w:w, h:h, r:(90/180)*Math.PI } // matrix
+			);
+			plot.moveTo(0  ,  0);
+			plot.lineTo(0  ,h-1);
+			plot.lineTo(w-1,h-1);
+			plot.lineTo(w-1,  0);
+			plot.lineTo(  0,  0);
+			plot.endFill();
+		}
+		{ // chart frame
+			plot.beginGradientFill("linear",
+				[ 0xF0F0F0, 0xFFFFFF ], // colors
+				[ 100, 100 ], // alphas
+				[ 0x00, 0xFF ], // ratios
+				{ matrixType:"box", x:cx, y:cy, w:cw, h:ch, r:90/180*Math.PI }
+			);
+			plot.moveTo(cx   ,cy   );
+			plot.lineTo(cx   ,cy+ch);
+			plot.lineTo(cx+cw,cy+ch);
+			plot.lineTo(cx+cw,cy   );
+			plot.endFill();
+
+		}
+		{ // xy axis
+			plot.lineStyle(1,0x888888,100);
+			plot.moveTo(cx,cy+ch);plot.lineTo(cx,cy);
+			plot.moveTo(cx,cy+ch);plot.lineTo(cx+cw,cy+ch);
+		}
+		{ // body line
+			plot.lineStyle(2,0x000044);
+//			plot.beginGradientFill("linear",[0xFF0000,0x0000FF],[100,100],[0,0xFF],{a:200,b:0,c:0,d:0,e:200,f:0,g:200,h:200,i:1})
+			this.drawLine(s,cx,cy,cw,ch,yMin,yMax);
+			plot.endFill();
+		}
+
+		if (s.length<2) return;
+
+		{ // x-tics
+			plot.swfwith("_level0.chart.xtics");
+			var d=this.gettic(xMax-xMin);
+			var x, depth=0;
+			for(x=xMin;x<=xMax;x+=d, ++depth){
+				var tx=cx+cw/xMax*x;
+				if (tx>cx+cw) break;
+				var ty=cy+ch;
+				plot.swfwith("_level0.chart.xtics");
+				plot.lineStyle(1,0x000000,20);
+				plot.moveTo(tx,cy);
+				plot.lineTo(tx,ty+2);
+				plot.createTextField(depth,depth,tx,ty,0,0);
+				plot.swfwith("_level0.chart.xtics."+depth);
+				plot.set("autoSize","center");
+				plot.set("text",x);
+			}
+		}
+		{ // y-tics
+			plot.swfwith("_level0.chart.ytics");
+			var d=this.gettic(yMax-yMin);
+			var y=int(yMin/d)*d;
+			var depth=0;
+			for(;y<=yMax;y+=d, ++depth){
+				var tx=cx;
+				var ty=cy+ch-(y-yMin)/(yMax-yMin)*ch;
+				if (ty<cy) break;
+				plot.swfwith("_level0.chart.ytics");
+				plot.lineStyle(1,0x000000,20);
+				plot.moveTo(cx+cw,ty);
+				plot.lineTo(tx-2 ,ty);
+				plot.createTextField(depth,depth,tx-1,ty-9,0,0);
+				plot.swfwith("_level0.chart.ytics."+depth);
+				plot.set("autoSize","right");
+				plot.set("text","R"+y);
+			}
+		}
+//		plot.removeTextField();
+	},
+	drawLine:function(a,ox,oy,w,h,yMin,yMax){
+		if (a.length<2) return;
+		var y0=h-(a[0]-yMin)/(yMax-yMin)*h;
+		plot.moveTo(ox,oy+y0); // s[0]
+		var i, n=a.length;
+		for(i=1;i<n;++i){
+			var x=w/(n-1)*i;
+			var y=h-(a[i]-yMin)/(yMax-yMin)*h
+			plot.lineTo(ox+x,oy+y);
+		}
+	},
+	gettic:function(range){
+		var d=Math.pow(10,int(Math.log(range)*Math.LOG10E))/10;
+		var n=range/d;
+		return (n>50?10:n>20?5:n>10?2:1)*d;
+	}
+};
+///////////////////////////////////////////////////////////////////
+var cache_data;
+var loginfo;
+var f=document.f;
+
+function OnAnalyzeBegin(){
+	vals=[]
+	eh('c','<button onclick="stop();">STOP</button>');
+}
+function OnEnumCache(key,loginfo_){
+	if (!loginfo_) return;
+	loginfo=loginfo_;
+	cache_data=cache.get(key).split("\n");
+
+	var tw=loginfo.tw;
+	var un  =cache_data[1].split(" ")[tw];
+	var rate=cache_data[3].split(",")[tw];
+	vals.push(Number(rate));
+}
+function OnAnalyzeEnd(){
+	chart.draw();
+}
+///////////////////////////////////////////////////////////////////
+eh('v',document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+function start(){uiGetEnumParam(document.f), enumLobbyID=0, logana.analyze(window);}
+function stop (){logana.stop();}
+function selchange(){stop(), setTimeout(start,1);}
+function init(){uiCreate(document.f,{rule_pf:2|64});selchange();}
+setTimeout(function(){
+	swf=window.document.movie; // plot.swf
+	if (!swf) swf=document.getElementById("mov");
+	if (swf){
+		plot.swfselect(swf);
+		//plot.swfwith("System");
+		//plot.set("useCodepage",false    ); // UTF8
+		//plot.swfwith("Stage");
+		//plot.set("showMenu"   ,false    );
+		//plot.set("scaleMode"  ,"noScale");
+		//plot.set("align"      ,"TL"     ); // top left
+		init();
+	}else{
+		setTimeout(arguments.callee,100);
+	}
+},100);
+</script>
+</body></html>

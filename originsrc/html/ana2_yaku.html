@@ -1,0 +1,214 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>役集計</title>
+	<style type="text/css">A:link{color:blue;}A:visited{color:blue;}A:hover{color:red;}BODY,TABLE{font-size:10pt;}</style>
+	<style type="text/css">
+		TH{border-bottom:1px solid #CCCCCC;padding:0 8px 0px 8px;font-weight:normal;}
+		TD{padding:0 8px 0px 8px;text-align:right;}
+	</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center>
+	<div id=v></div>
+	<hr size=1 color=#CCCCCC>
+	<form name=f style="margin:0px;"></form>
+	<br>
+	<div id=c></div>
+	<hr size=1 color=#CCCCCC>
+	※割合%=役の出現回数/和了数
+	※複合飜=和了の合計飜数<br>
+	※素点=リーチ棒、積み棒を除く
+	※巡目=ツモ回数<br>
+	</center>
+
+<script type="text/javascript" src="tenhou.js"></script>
+<script type="text/javascript" src="util.js"></script>
+<script type="text/javascript">
+///////////////////////////////////////////////////////////////////
+// TENHOU.NET (C)C-EGG http://tenhou.net/
+//-----------------------------------------------------------------
+var we=window.external; // 内部関数呼び出し用
+var logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0"); // IDispatchLogAnaImpl
+var cache=logana.cache; // IDispatchCacheImpl
+//var sortAs="CTimeAscent"; // ファイル作成時間の古いものから
+var sortAs="CTimeDescent"; // ファイル作成時間の新しいものから(default)
+var enumPlayer;
+var enumLobbyID;
+var enumMatchMask;
+var enumMatch;
+
+///////////////////////////////////////////////////////////////////
+// MAIN
+//-----------------------------------------------------------------
+var c=[]; // output
+var nAgari;
+var nPlay;
+var icol=1;  // sort priority first
+var iicol=1; // sort priority second
+var ab=0;
+function fab(a,b){return a[icol]==b[icol]?b[iicol]-a[iicol]:a[icol]-b[icol];}
+function fba(a,b){return a[icol]==b[icol]?b[iicol]-a[iicol]:b[icol]-a[icol];}
+function sl(i){
+	if (i!=-1){
+		ab=(icol!=i?0:!ab);
+		icol=i;
+	}
+	c.sort(ab?fab:fba);
+	var s="";
+	s+="<table cellpadding=0 cellspacing=0 >";
+	s+="<colgroup><col></col><col span=10 align=right ></col></colgroup>";
+	s+="<tr class=h >"+
+		"<th><a href='javascript:sl( 0);'>名前</a></th>"+
+		"<th><a href='javascript:sl( 1);'>回数</a></th>"+
+		"<th><a href='javascript:sl( 2);'>割合%</a></th>"+
+		"<th><a href='javascript:sl( 3);'>飜数</a></hd>"+
+		"<th><a href='javascript:sl( 4);'>複合飜</a></th>"+
+		"<th><a href='javascript:sl( 5);'>素点</a></th>"+
+//		"<th><a href='javascript:sl( 6);'>立直%</a></th>"+
+//		"<th><a href='javascript:sl( 7);'>巡目</a></th>"+
+//		"<th><a href='javascript:sl( 8);'>副露%</a></th>"+
+//		"<th><a href='javascript:sl( 9);'>副露数</a></th>"+
+//		"<th><a href='javascript:sl(10);'>初副露巡</a></th>"+
+		"</tr>";
+	var i;
+	for(i=0;i<c.length;++i){
+		var a=c[i];
+		s+="<tr><td>"+
+			YAKU[a[0]]+"</td><td>"+
+			a[1]+"</td><td>"+
+			ff(a[ 2],1,3)+"</td><td>"+
+			ff(a[ 3],1,2)+"</td><td>"+
+			ff(a[ 4],1,2)+"</td><td>"+
+			ff(a[ 5],1,1)+"</td>"+
+//			ff(a[ 6],1,2)+"</td><td>"+
+//			ff(a[ 7],1,2)+"</td><td>"+
+//			ff(a[ 8],1,2)+"</td><td>"+
+//			ff(a[ 9],1,3)+"</td><td>"+
+//			ff(a[10],1,3)+"</td>"+
+			"</tr>";
+	}
+	s+="</table>";
+	s+="<br>";
+	s+="対戦数:"+nPlay+"&nbsp;&nbsp;&nbsp;和了数:"+nAgari+"<br>";
+	eh('c',s);
+
+	var oov=function(){this.style.color="#FF0000";}
+	var oot=function(){this.style.color="";}
+	var a=ei("c","TR");
+	for(i=1;i<a.length;++i){
+		var e=a[i];
+		e.onmouseover=oov;
+		e.onmouseout =oot;
+	}
+}
+
+///////////////////////////////////////////////////////////////////
+var cache_data;
+var loginfo;
+function OnAnalyzeBegin(){
+	c=[];
+	nAgari=0;
+	nPlay=0;
+	var i;
+	for(i=0;i<YAKU.length;++i) c.push({y:i,n:0,h:0,hh:0,t:0,j:0,jf:0,f:0,nf:0,r:0});
+	eh('c','<button onclick="stop();">STOP</button>');
+}
+function OnEnumCache(key,loginfo_){
+	if (!loginfo_) return;
+	loginfo=loginfo_;
+	cache_data=cache.get(key).split("\n");
+
+	var tw=loginfo.tw;
+	cache_data[10]=eval("["+cache_data[10]+"]");
+	cache_data[11]=eval("["+cache_data[11]+"]");
+	var n=0;
+	for(;n<cache_data[10].length;++n){
+		var a=cache_data[10][n];
+		if (a[0].length!=13) continue;
+
+		var 立直巡=[-1,-1,-1,-1];
+//		var nHonba=ii[1];
+//		var nagare=ii[2];
+		var 副露数=[0,0,0,0];
+		var furo_step_first=-1;
+		for(var i=0;i<cache_data[11][n].length;++i){
+			var ac=cache_data[11][n][i];
+			var who=ac[0];
+			switch(a.length){
+			case 2: // reach
+				立直巡[who]=ac[1];
+				break;
+			case 10: // naki
+				if (ac[2]==NAKI.ANKAN || ac[2]==NAKI.NUKI) continue;
+				副露数[who]++;
+				if (who==tw && 副露数[who]==1) furo_step_first=ac[8];
+				break;
+			}
+		}
+		var furo_num=副露数[tw];
+		var reach=(立直巡[tw]>-1?1:0);
+
+		var nn=0;
+		for(;nn<a.length;++nn){
+			var aa=a[nn];
+			if (tw!=aa[0]) continue;
+			var tokuten=aa[2];
+			var yaku   =aa[4];
+			var yakuman=aa[5];
+			var step   =aa[10];
+			var i, han=0;
+			if (yakuman.length){ // 純粋役満の場合は役は無効
+				han=yakuman.length*13; // １３飜としてカウント
+				for(i=0;i<yakuman.length;++i){ // yakuman=[役,役,...]
+					var e=c[yakuman[i]];
+					++e.n, e.h+=13, e.hh+=han, e.t+=tokuten, e.j+=step, e.r+=reach;
+					if (furo_num) e.f+=1, e.nf+=furo_num, e.jf+=furo_step_first;
+				}
+			}else{
+				for(i=0;i<yaku.length;i+=2) han+=yaku[i+1];
+				for(i=0;i<yaku.length;i+=2){ // yaku=[役,飜,役,飜,...]
+					var e=c[yaku[i]];
+					if (!yaku[i+1]) continue; // 裏ドラは0の場合もある
+					++e.n, e.h+=yaku[i+1], e.hh+=han, e.t+=tokuten, e.j+=step, e.r+=reach;
+					if (furo_num) e.f+=1, e.nf+=furo_num, e.jf+=furo_step_first;
+				}
+			}
+			++nAgari;
+		}
+	}
+	++nPlay;
+}
+function OnAnalyzeEnd(){
+	var cc=[];
+	var i;
+	for(i=0;i<c.length;++i){
+		var e=c[i];
+		if (!e.n) continue;
+		cc.push([
+			i,
+			e.n,
+			e.n/nAgari*100,
+			e.h/e.n,
+			e.hh/e.n,
+			e.t/e.n,
+			e.r/e.n*100,
+			e.j/e.n,
+			e.f/e.n*100,
+			e.nf/e.n,
+			e.jf/e.n
+		]);
+	}
+	c=cc;
+	sl(-1);
+}
+///////////////////////////////////////////////////////////////////
+eh('v',document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+function start(){uiGetEnumParam(document.f), logana.analyze(window);}
+function stop(){logana.stop();}
+function selchange(){stop(), setTimeout(start,1);}
+function init(){uiCreate(document.f,{show_lobby:true,rule_pf:2|4|8|16|32|64,use_taku:true});selchange();}
+init();
+</script>
+</body></html>

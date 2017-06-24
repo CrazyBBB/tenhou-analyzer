@@ -1,0 +1,328 @@
+ <html><head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<title>牌譜の書式変換</title>
+	<style type="text/css">
+		A:link{color:blue;}
+		A:visited{color:blue;}
+		A:hover{color:red;}
+		BODY,TABLE{font-size:10pt;}
+		DIV#c{white-space:nowrap;font-family:'ＭＳ ゴシック';}
+	</style>
+</head><body>
+	<script type="text/javascript" src="navi.js"></script>
+
+	<center>
+	<div id=v></div>
+	<hr size=1 color=#CCCCCC>
+	<button id=b onclick="next();">NEXT</button>
+	<button id=b onclick="save();">すべての牌譜をファイルに保存</button>
+	<br>
+	※mjscore.txtとの互換性はありません<br>
+	○ダブロンあり
+	○北抜き
+	○ダブル役満なし
+	○流し満貫あり
+	○パオあり
+	○段位/性別などなど…
+	</center>
+	<hr size=1 color=#CCCCCC>
+	<div id=c></div>
+
+<script type="text/javascript" src="tenhou.js"></script>
+<script type="text/javascript">
+///////////////////////////////////////////////////////////////////
+// TENHOU.NET (C)C-EGG http://tenhou.net/
+//-----------------------------------------------------------------
+
+///////////////////////////////////////////////////////////////////
+// UTIL
+//-----------------------------------------------------------------
+function e(n)  {return document.getElementById(n);}
+function h(n,s){e(n).innerHTML=s;}
+function t(n,s){e(n).innerText=s;}
+function ff(n) {return n>0?"+"+n:n}
+function int(n){return Math.floor(n);}
+var we=window.external; // 内部関数呼び出し用
+
+///////////////////////////////////////////////////////////////////
+// INTERNAL OBJETCS
+//-----------------------------------------------------------------
+// IDispatchLogAnaImpl ={analyze({}),stop(),nTotal,nProgress}
+// IDispatchFileImpl   ={open(default,ext,title),close(),write(str)}
+// IDispatchLogInfoImpl={file,wGameType,wLobbyID,tw}
+// IDispatchPlayerImpl ={un,dan,rate,sx,tehai,ten}
+// IDispatchTehaiImpl  ={operator[],length,sort(),toArray(),syanten()}
+//-----------------------------------------------------------------
+var logana;  // IDispatchLogAnaImpl
+var file;    // IDispatchFileImpl
+var loginfo; // IDispatchLogInfoImpl   [static reference]
+var player;  // IDispatchPlayerImpl    [static reference]
+logana=we.mjCommand("CREATEINSTANCE::LOGANA1.0");
+
+
+///////////////////////////////////////////////////////////////////
+// LOCAL
+//-----------------------------------------------------------------
+var HT=[ // local use
+	"1m","2m","3m","4m","5m","6m","7m","8m","9m", // 萬子
+	"1p","2p","3p","4p","5p","6p","7p","8p","9p", // 筒子
+	"1s","2s","3s","4s","5s","6s","7s","8s","9s", // 索子
+	"東","南","西","北","白","発","中"
+];
+
+// for enum
+var nEnum=0;
+var nTarget;
+// for output
+var output=[]; // 初期化は[]で１件HTML出力、undefinedで全件ファイル出力
+var s=[];  // １行ごとのテキスト
+var se=[]; // 和了 or 流局
+var sh=[]; // 配牌
+var ss=[]; // 摸打鳴きリーチなどの動作１つ
+function flush(){
+	if (output){
+		output.push(s.join("\r\n"));
+	}else{
+		file.write(s.join("\r\n"));
+		file.write("\r\n");
+	}
+	s=[];
+}
+// internal state
+var lastHai136=-1;
+var lastWho=-1;
+var doraOmote="";
+var doraUra="";
+var scene={kyoku:0,honba:0,nagare:0};
+// tool
+var totxt={
+	hai_aka:function(hai136){
+		if (hai136==(9*0+4)*4+0) return "5M"; // 萬子赤５
+		if (hai136==(9*1+4)*4+0) return "5P"; // 筒子赤５
+		if (hai136==(9*2+4)*4+0) return "5S"; // 索子赤５
+		return HT[int(hai136/4)];
+	},
+	hai_noaka:function(hai136){
+		return HT[int(hai136/4)];
+	},
+	hai:undefined, // entry
+	sc:function(sc){
+		var t="  ";
+		t+=KYOKU[scene.kyoku%16]+" "+scene.honba+"本場(リーチ"+scene.nagare+") ";
+		if (sc[1]) t+=" "+player[0].un+" "+sc[1]+"00";
+		if (sc[3]) t+=" "+player[1].un+" "+sc[3]+"00";
+		if (sc[5]) t+=" "+player[2].un+" "+sc[5]+"00";
+		if (sc[7]) t+=" "+player[3].un+" "+sc[7]+"00";
+		return t;
+	},
+	haipai:function(who,oya){
+		var p=player[who];
+		p.tehai.sort();
+		var t="    ["+(who+1)+""+KAZE[(4+who-oya)%4]+"]";
+		for(i=0;i<13;++i) t+=totxt.hai(p.tehai[i]);
+		return t;//+" ("+p.tehai.syanten()+"向聴)";
+	}
+};
+
+
+///////////////////////////////////////////////////////////////////
+// EVENT HANDLER
+//-----------------------------------------------------------------
+//function OnAnalyzeBegin()
+//function OnEnumLog(loginfo)
+//function OnLogBegin(loginfo,player[4])
+//function OnSceneBegin(kyoku,honba,nagare,dice0,dice1,dora[1])
+//function OnTsumo(who,hai136)
+//function OnDahai(who,hai136)
+//function OnNaki(who,m,type,kui,hai0,hai1,hai2,hai3)
+//function OnDora(hai136)
+//function OnReach()
+//function OnAgari(who,fu,tokuten,mangan,yaku[],yakuman[],doraUra[],sc[8],paoWho)
+//function OnRyuukyoku(type,sc[8],show[4])
+//function OnSceneEnd()
+//function OnLogEnd(sc[8]);
+//function OnAnalyzeEnd(pf)
+//※ sc=[ten0,diff0,ten1,diff1,ten2,diff2,ten3,diff3]
+//-----------------------------------------------------------------
+// ANALYZER PARAM
+//-----------------------------------------------------------------
+//var sSortAs	"CTimeAscent"|"CTimeDescent"
+//※ ソートはOnEnumLogとOnLogBeginの間で行なう
+//-----------------------------------------------------------------
+//var sSortAs="CTimeAscent"; // ファイル作成時間の古いものから
+var sSortAs="CTimeDescent"; // ファイル作成時間の新しいものから(default)
+
+function OnAnalyzeBegin(){
+	nEnum=0;
+	nTarget=(nTarget==undefined?0:nTarget+1);
+	h('c',"");
+	h('b',"STOP");
+	e('b').onclick=stop;
+}
+function OnEnumLogHTML(f){ // (ret:bool analyze or not)
+	return nEnum++==(nTarget!=undefined?nTarget:0); // 初回は１件目、以降ランダム
+}
+function OnEnumLogFILE(f){
+	return true;
+}
+var OnEnumLog; // entry
+function OnLogBegin(f,c){
+	loginfo=f;
+	player=c;
+	totxt.hai=(f.wGameType&GT.NOAKA?totxt.hai_noaka:totxt.hai_aka);
+
+	var t="";
+	t+="天鳳 ";
+	t+=(f.wLobbyID>=10000?"C":"L")+("000"+(f.wLobbyID%10000)).slice(-4);
+	t+=" ";
+	t+="般上特鳳".substr(GT.taku(f.wGameType),1);
+	if ( f.wGameType&GT.SANMA) t+="３";
+	t+=( f.wGameType&GT.NAN?"南":"東");
+	if (~f.wGameType&GT.NOKUI) t+="喰";
+	if (~f.wGameType&GT.NOAKA) t+="赤";
+	if ( f.wGameType&GT.SAKU ) t+="速";
+
+	var file=f.file;
+	var url="http://tenhou.net/0/?log="+file+"&tw="+f.tw;
+	s.push("===== "+t+" 開始 "+file.substr(0,4)+"/"+file.substr(4,2)+"/"+file.substr(6,2)+" "+url+" =====");
+	t="  持点"+(f.wGameType&GT.SANMA?35000:25000)+
+		" [1]"+c[0].un+"/"+DAN[c[0].dan]+"/"+SX[c[0].sx]+" R"+c[0].rate+
+		" [2]"+c[1].un+"/"+DAN[c[1].dan]+"/"+SX[c[1].sx]+" R"+c[1].rate+
+		" [3]"+c[2].un+"/"+DAN[c[2].dan]+"/"+SX[c[2].sx]+" R"+c[2].rate;
+	if (~f.wGameType&GT.SANMA) t+=
+		" [4]"+c[3].un+"/"+DAN[c[3].dan]+"/"+SX[c[3].sx]+" R"+c[3].rate;
+	s.push(t);
+	flush();
+}
+function OnSceneBegin(kyoku,honba,nagare,dice0,dice1,dora){
+	scene={kyoku:kyoku,honba:honba,nagare:nagare};
+	s=[], se=[], sh=[];
+	lastHai136=-1;
+	lastWho=-1;
+	doraOmote="";
+	doraUra="";
+	var oya=kyoku%4;
+	sh.push(totxt.haipai(0,oya));
+	sh.push(totxt.haipai(1,oya));
+	sh.push(totxt.haipai(2,oya));
+	if (~loginfo.wGameType&GT.SANMA){
+	sh.push(totxt.haipai(3,oya));
+	}
+	doraOmote+=totxt.hai(dora[0]);
+}
+function OnTsumo(who,hai136){
+	ss.push((who+1)+"G"+totxt.hai(hai136));
+	lastWho=who;
+	lastHai136=hai136;
+}
+function OnDahai(who,hai136){
+	ss.push((who+1)+(lastHai136==hai136?"D":"d")+totxt.hai(hai136));
+	lastWho=who;
+	lastHai136=hai136;
+}
+function OnNaki(who,m,type,kui,hai0,hai1,hai2,hai3){ // kui=誰から hai0=鳴いた牌 hai1,2,3=使用牌
+	switch(type){
+	case NAKI.CHII:ss.push((who+1)+"C"+totxt.hai(hai1)+totxt.hai(hai2));break;
+	case NAKI.PON :ss.push((who+1)+"N"+totxt.hai(hai1)+totxt.hai(hai2));break;
+	case NAKI.NUKI:ss.push((who+1)+"抜き"+totxt.hai(hai0));break;
+	default:       ss.push((who+1)+"K"+totxt.hai(hai0));break;
+	}
+	lastWho=who;
+	lastHai136=-1; // 待ちを判別する場合にはNAKI.CHAKANとNAKI.NUKIのhai0を取る
+}
+function OnDora(hai136){doraOmote+=totxt.hai(hai136);}
+function OnReach(who){ss.push((who+1)+"R");}
+
+function OnAgari(who,fu,tokuten,mangan,yaku,yakuman,_doraUra,sc,paoWho){
+	ss.push((who+1)+"A");
+	se.push(totxt.sc(sc));
+
+	var i,t="    ";
+	if (mangan){
+		t+=MANGAN[mangan];
+	}else{
+		var han=0;
+		for(i=0;i<yaku.length;i+=2) han+=yaku[i+1];
+		t+=fu+"符"+tokuten+"点"+han+"飜";
+	}
+	t+=(who==lastWho?"ツモ":"ロン");
+	for(i=0;i<yaku   .length;i+=2) t+=" "+YAKU[yaku[i]]+yaku[i+1];
+	for(i=0;i<yakuman.length;++i ) t+=" "+YAKU[yakuman[i]];
+	if (paoWho!=-1) t+=" パオ:"+paoWho;
+	se.push(t);
+	for(i=0;i<_doraUra.length;++i) doraUra+=totxt.hai(_doraUra[i]);
+}
+function OnRyuukyoku(type,sc,show){
+	se.push(totxt.sc(sc));
+
+	var t="    流局";
+	if (type) t+="/"+RYUUKYOKU[type];
+	se.push(t);
+}
+function OnSceneEnd(){
+	while(se.length) s.push(se.shift());
+	while(sh.length) s.push(sh.shift());
+	s.push("    [表ドラ]"+doraOmote+" [裏ドラ]"+doraUra);
+	while(ss.length) s.push("    * "+ss.splice(0,14).join(" "));
+	s.push("");
+	flush();
+}
+
+function OnLogEnd(sc){
+	var c=player;
+	var a=[
+		{un:c[0].un,sc:sc[1]},
+		{un:c[1].un,sc:sc[3]},
+		{un:c[2].un,sc:sc[5]} ];
+	if (~loginfo.wGameType&GT.SANMA) a.push(
+		{un:c[3].un,sc:sc[7]}
+	);
+	a.sort(function(a,b){return b.sc-a.sc;});
+	s.push("  ---- 試合結果 ----");
+	s.push("  1位 "+a[0].un+" "+ff(a[0].sc));
+	s.push("  2位 "+a[1].un+" "+ff(a[1].sc));
+	s.push("  3位 "+a[2].un+" "+ff(a[2].sc));
+	if (~loginfo.wGameType&GT.SANMA){
+	s.push("  4位 "+a[3].un+" "+ff(a[3].sc));
+	}
+	s.push("----- 終了 -----");
+	s.push("");
+	flush();
+}
+function OnAnalyzeEnd(){ // 解析終了 正常終了時のみ
+	if (output){
+		t('c',output.join("\r\n"));
+	}else{
+		alert("保存しました");
+		file.close();
+	}
+	output=undefined;
+	stop();
+}
+
+
+///////////////////////////////////////////////////////////////////
+// UI
+//-----------------------------------------------------------------
+function save(){
+	file=we.mjCommand("CREATEINSTANCE::FILE1.0");
+	if (!file.open("default",".txt","すべての牌譜を保存")) return;
+	output=undefined; // ファイル出力フラグを兼ねる
+	OnEnumLog=OnEnumLogFILE;
+	logana.analyze(window);
+}
+function next(){
+	output=[];
+	OnEnumLog=OnEnumLogHTML;
+	logana.analyze(window);
+}
+function stop(){
+	logana.stop();
+	h('b',"NEXT");
+	e('b').onclick=next;
+}
+h('v',document.title+" / LogAna Ver"+we.mjCommand("VERSION"));
+next();
+</script>
+</body></html>
